@@ -1,0 +1,355 @@
+---
+title: "Assignment_One_APM_Group_8"
+author: "Olayinka_Arimoro, Oluwatosin_Oderinde, Pascal_Okechukwu"
+date: "January 24, 2020"
+output: html_document
+---
+
+About Assignment One
+This assignment was completed on `r date()`. This is the assignment one of the Applied Predictive Modelling in R by Max Kuhn and Kjell Johnson. This assignment was submitted by team 8 members of iAspire fellowship in Data Science. THe names of team members are Olayinka Arimoro, Oluwatosin Oderinde, and Pascal Okechukwu.
+This assignment tests our understanding of the first 2 chapters of the book that centered on data preprocessing processes such as checking the distribution of variables, dealing with issues of collinearity and multicollinearity, dealing with missing values and imputations etc.
+
+
+```{r importing libraries}
+library(e1071)
+require(lattice)
+library(car)
+```
+# Exercise 3.1
+```{r}
+library(mlbench)
+data(Glass)
+str(Glass)
+```
+## Exercise 3.1 (a)
+Using visualizations, explore the predictor variables to understand their distributions as well as the relationships between predictors
+```{r Visualizations to show the distribution}
+# To check for the distribution of the predictor variables. We explored this variables using four different visualizations and got the same results.
+# (I) Histograms
+pre_var <- Glass[,1:9]
+# Show histograms of the predictor variables
+par(mfrow = c(3,3))   # This produces a 3 by 3 plot of the histograms
+for (i in 1:ncol(pre_var)){
+  hist(pre_var[, i], 
+       xlab = names(pre_var[i]),
+       main = paste(names(pre_var[i]), "Histogram"),
+       col = gray(.9))
+}
+
+# (II) Q-Q Plot
+# Show a quantile-quantile plot of the predictor variables
+par(mfrow = c(3,3))  
+for (i in 1:ncol(pre_var)){
+  qqnorm(pre_var[, i],
+         xlab = names(pre_var[i]),
+         main = paste("Q-Q Plot of ",names(pre_var[i])),
+         col = "steelblue")
+}
+
+# (III) Calculate the numerical values through the skewness
+# To check for the skewness
+skew_val <- apply(pre_var, 2, skewness)
+skew_val
+
+# (IV) Stem and leaf display
+# Show a stem and leaf display
+par(mfrow = c(3,3))
+for (i in 1:ncol(pre_var)){
+  stem(pre_var[, i])
+}
+
+# (V) Density Plot
+# Show a density plot
+par(mfrow = c(3,3))
+for (i in 1:ncol(pre_var)){
+  den <- density(pre_var[, i], na.rm = TRUE) # Remove missing values from the plot
+  plot(den, main = paste("Density plot of ", names(pre_var[i])))
+  polygon(den, col = "red")
+}
+
+# To show relationship between predictor variables we produce a matrix of scatter plots
+plot(pre_var, main = "Scatter Plot of Predictor Variable")
+
+# Quantifying the correlation between predictors
+corr <- data.frame(cor(pre_var, method = "pearson"))
+print(corr)
+```
+## Observations from (a) above
+From the visualizations about the distributions. We discovered that, some of the predictors seems to look like the normal distribution. However, the predictors were either right-skewed or left-skewed as seen from the result of skew_val.
+In addition, we noticed that the predictor "Mg" even though it is left-skewness with skewness value of -1.14 seems to be some sort of "saddle" distribution since it looks like some sort of a bi-modal distribution.
+As regards the relationship between the predictors. It is worthy of mention that from the scatter plot and the numerical values gotten, the correlation of some predictors are strongly positive, like RI and Ca with a correlation value of 0.81. Others were strongly negative like RI and Si with correlation value of -0.54.
+
+## Exercise 3.1 (b)
+Do there appear to be any outliers in the data? Are any predictors skewed?
+```{r Checking for Outliers}
+# To check for outlier, we used the box plot
+par(mfrow = c(3,3))  
+for (i in 1:ncol(pre_var)){
+  boxplot(pre_var[, i], xlab = names(pre_var[i]),
+       main = paste("Boxplot of ",names(pre_var[i])),
+       horizontal = TRUE, col = "steelblue")
+}
+
+# Observation
+# The boxplot shows outliers in every variable except for Mg. The most extreme outliers appear in K and Ba variables. As presented earlier, the boxplot also show that some variables are moderately skewed, some are left-skewed, while some are right-skewed. 
+```
+## Exercise 3.1 (c)
+Are there any relevant transformations of one or more predictors that might improve the classification model?
+```{r}
+# Using Box-Cox transformation
+library(car)
+summary(
+  powerTransform(
+    Glass[,1:9],
+    family = "yjPower")  # yjpower parameter allows for negative values
+  )$result[,1:2]
+
+# Observation
+# The Boxcox transformations might improve the classification model from the result of the powerTransform.
+
+# Using the preProcess class from the caret package.
+library(caret)
+trans <- preProcess(pre_var, method = c("BoxCox", "center", "scale", "pca"))
+trans
+
+# Visualizing the results after transformation
+transformed_data <- predict(trans, pre_var)
+
+plot(transformed_data, main = "Scatter Plot of Predictor Variable")
+# The scatter plot shows that the all the predictors have about zero variance
+
+par(mfrow = c(3,3))   # This produces a 3 by 3 plot of the histograms
+for (i in 1:ncol(transformed_data)){
+  hist(transformed_data[, i], 
+       xlab = names(transformed_data[i]),
+       main = paste(names(transformed_data[i]), "Transformed Histogram"),
+       col = gray(.9))
+}
+```
+
+# Exercise 3.2
+```{r}
+library(mlbench)
+data("Soybean")
+str(Soybean)
+?Soybean   # Checking the documentation of Soybean for details
+# There are 35 categorical  variables, all numerical and a nominal variable denoting the class
+```
+##  Exercise 3.2 (a)
+Investigate the frequency distributions for the categorical predictors. Are any of the distributions degenerate in the ways discussed in this chapter?
+```{r}
+help("Soybean")
+# The summary function shows the frequency distribution for each variable
+summary(Soybean)
+# This summary shows that some predictors have unique value prevelent.
+
+pre_var1 <- Soybean[,1:36]
+# We went ahead to show a bar plot to see the frequency distribution
+par(mfrow = c(3,3))  
+for (i in 1:ncol(pre_var1)){
+  barplot(table(pre_var1[, i]), xlab = names(pre_var1[i]),
+       main = paste("Barplot of ",names(pre_var1[i])),
+       col = "steelblue")
+}
+
+# The bar plot shows that some variables like leaf_mild, mycelium have most values to be zero
+
+# Next is to explore the distributions are degenerate
+pre_var2 <- Soybean[,2:36]   # To exclude the class
+
+# To investigate degeneracy, we will use the nearZeroVar function from the caret package
+library(caret)
+nearZeroVar(pre_var2, names = TRUE, saveMetrics = T)
+
+# By the rule of thumb from the textbook, leaf_mild, mycelium, and sclerotia all have frequency ratio greater than 20. We conclude that leaf_mild, mycelium, and sclerotia have near zero variance. We can conclude they are degenerate.
+```
+Exercise 3.2 (b)
+Roughly 18% of the data are missing. Are there particular predictors that are more likely to be missing? Is the pattern of missing data related to the classes
+```{r}
+# Using the aggr function from VIM package to calculate how many missing values in each variable
+library(VIM)
+aggr(Soybean, prop = c(T, T), bars = T, numbers = T, sortVars=T)
+
+# The result agrees with the statement that about 18% of the data is missing because the plot showed that about 82.3% of the data are complete cases (not missing)
+
+# To aggregate summaries from data and seek to find the pattern of missign data related to classes. We call the dplyr function (a powerful data wrangling tool)
+# Using the dplyr library
+library(dplyr)
+
+# Chain Method Command in dplyr
+miss_pattern <- Soybean %>%
+  mutate(Total = n()) %>%     #adds new variable
+  filter(!complete.cases(.)) %>%
+  group_by(Class) %>%
+  mutate(Missing = n(), Proportion = Missing/Total) %>%
+  select(Class, Missing, Total, Proportion)  %>%
+  unique()  %>%
+  as.data.frame(Soybean)
+
+print(miss_pattern)
+```
+Intepretation:
+From the result above, we can see that the pattern of missing data related to the classes. We used the dplyr function to filter, group and mutate the data. We saw that there were 5 classes that accounted for the missing values in the data, with most of the missing values in the "phytophthora-rot" class with about 10% incomplete cases.
+
+# Exercise 3.2 (c)
+Develop a strategy for handling missing data, either by eliminating predictors or imputing
+```{r}
+library(mice)
+
+# We decided to carry out imputation since the variables could still be useful. Moreover, with 8% missing value, we can still make sense of the data using the right imputation method.
+
+# We used the mice function from the mice package. The simple imputation method used here is Predictive Mean Matching from mice. This method imputes missing values using the idea of nearest neighbour donor.
+
+# Imputation using predictive mean matching method
+pmm_impute <- mice(Soybean, method = "pmm", printFlag = F)
+aggr(complete(pmm_impute), prop = c(T, T), bars = T, numbers = T, sortVars=T)
+```
+Observation: After the imputations were made, a complete dataset is created using the complete() function. The aggr function was then used to calculate the amount of missing values in each variable. We saw that there was no missing values left in the data.
+
+# Exercise 3.3 (a)
+Start R and use these commands to load the data
+```{r}
+library(caret)
+data(BloodBrain)
+?BloodBrain    # Checking the documentation of BloodBrain for details
+
+# The details of Bloodbrain showed that the vector "logBBB" contains the concentration ratio and the data frame "bbbDescr" contains the descriptor values. There were 134 descriptors calculated in total, and 208 non-proprietary literature compounds.
+
+str(logBBB) # Checking the structure of the numeric outcome
+str(bbbDescr) # Checking the structure of the predictors
+dim(bbbDescr)  # Checking the dim of the predictor
+
+# We have 208 rows and 134 columns just as the details suggested.
+```
+# Exercise 3.3 (b)
+Do any of the individual predictors have degenerate distributions?
+```{r}
+# To check if there are any degenerate function, we would check if there are any
+# near zero function using the nearZeroVar function from the caret package
+
+pre_near_zero <- nearZeroVar(
+  bbbDescr, saveMetrics = TRUE) # We save metrics so as to retain information about each predictor
+
+# Viewing the first 10 predictors out of 134 predictors
+head(pre_near_zero, 10)
+
+# Checking through the list of predictor variables that are degenerate (near zero variance predictors)
+rownames(pre_near_zero)[pre_near_zero$nzv]
+
+#This shows that there are seven predictor variables that are degenerate. We need to remove this variables
+
+new_predictor <- 
+  bbbDescr[, 
+  !pre_near_zero$nzv] # This returns other predictors that are not degenerate
+
+ncol(new_predictor) # There are now 127 predictors
+
+# For example
+table(bbbDescr$negative)  # Predictor variable "negative" has 207 zero values
+table(bbbDescr$peoe_vsa.2.1)  # This predictor has 179 zero values
+table(bbbDescr$alert)  # This predictor has 207 zero values
+```
+Exercise 3.3(c)
+Generally speaking, are there strong relationships between the predictor data? If so, how could correlations in the predictor set be reduced? Does this have a dramatic effect on the number of predictors available for modelling?
+```{r}
+# Procedure:
+# We first checked the distributions of the variables, transformed where necessary before checking for between predictors relationships.
+
+# It would be difficult to check for relationships between 127 variables using a scatter plot. The best we can do is to sample some predictors and check for their relationship.
+
+set.seed(42)  # This is so that the result is reproducable
+
+# Sampling 12 predictors
+sample1 <- new_predictor[, sample(1:ncol(new_predictor), 12)]
+names(sample1)
+
+# Show a density plot of sampled data
+par(mfrow = c(3,4))
+for (i in 1:ncol(sample1)){
+  den_raw <- density(sample1[, i], na.rm = TRUE)
+  plot(den_raw, main = paste("Density plot of ", names(sample1[i])))
+  polygon(den_raw, col = "red")
+}
+
+# A couple of predictors showed skewness. We will check for skewness in the data
+skew_raw <- apply(new_predictor, 2, skewness)
+summary(skew_raw)
+
+# Looking at the data as a whole, we observed that quite a number of the predictors are either left-skewed or right-skewed.
+
+# As custom, let us transform and compare before checking relationship between the data.
+
+# We will employ the Yeo-Johnson transformation because it can cater for negative values, since we have negative values from the summary of skew values
+
+yj_tran <- preProcess(new_predictor, method = "YeoJohnson")   #yj transformation
+yj_trans_data <- predict(yj_tran, newdata = new_predictor)
+sample2 <- yj_trans_data[, names(sample1)]
+
+# Show a density plot of tranformed sampled data
+par(mfrow = c(3,4))
+for (i in 1:ncol(sample2)){
+  den_yj <- density(sample2[, i], na.rm = TRUE)
+  plot(den_yj, main = paste("Density plot of ", names(sample2[i])))
+  polygon(den_yj, col = "red")
+}
+
+skew_yj <- apply(yj_trans_data, 2, skewness)
+summary(skew_yj)
+
+# Even though the result improved after the transformation. There were some variables that were still skewed to the left or to the right as shown from the skewness result.
+
+# Lets perform the spatial sign transformation
+trans_ssdata <- spatialSign(scale(new_predictor))
+sample3 <- trans_ssdata[, names(sample1)]  # Applying ss transformation on the sample of predictors.
+
+# Show a density plot of spatial sign transformed sampled data
+par(mfrow = c(3,4))
+for (i in 1:ncol(sample3)){
+  den_ss <- density(sample3[, i], na.rm = TRUE)
+  plot(den_ss, main = paste("Density plot (SS) of ", names(sample3[i])))
+  polygon(den_ss, col = "steelblue")
+}
+
+# Checking for skewness
+skewSS <- apply(trans_ssdata, 2, skewness)
+summary(skewSS)
+
+# Checking the relationship of other predictors
+
+library(corrplot)
+raw_corr <- cor(new_predictor)
+yj_corr <- cor(yj_trans_data)
+ss_corr <- cor(trans_ssdata)
+
+# Plot the matrix with no labels or grid
+corrplot(raw_corr, 
+         order = "hclust", 
+         addgrid.col = NA, 
+         tl.pos = "n",
+         main = "Correlation Plot for Original Data")
+corrplot(yj_corr, 
+         order = "hclust", 
+         addgrid.col = NA, 
+         tl.pos = "n",
+         main = "Correlation Plot for yj Transformed Data")
+corrplot(ss_corr, 
+         order = "hclust", 
+         addgrid.col = NA, 
+         tl.pos = "n",
+         main = "Correlation Plot for ss Transformed Data")
+
+# The visualizations showed that correlation lessened (there were more portions that were dark brown) with increasing level of transformations.
+
+# To validate this
+correlation_info <- function(x) summary(x[upper.tri(x)])
+# For the raw data
+correlation_info(raw_corr)
+
+# For the Yeo-Johnson transformed data
+correlation_info(yj_corr)
+
+# For the spatial sign transformed data
+correlation_info(ss_corr)
+
+# Finally, in order to resolve in between correlations in predictors, rather than transforming the data. We suggest a procedure that finds the best predictors after stating a level of pair-wise correlation we are willing to accept say 0.75 as suggested in the text. Afterwards, we remove other predictors above the set threshold.
+```

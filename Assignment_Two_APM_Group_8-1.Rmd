@@ -1,0 +1,207 @@
+---
+title: "Assignment_Two_APMR_Group_8"
+author: "Oluwatosin_Oderinde, Pascal_Okechukwu, Olayinka_Arimoro"
+date: "January 30, 2020"
+output: html_document
+---
+About Assignment Two
+This assignment was completed on `r date()`. This is the assignment 2 of the Applied Predictive Modelling in R by Max Kuhn and Kjell Johnson. This assignment was submitted by team 8 members (module 2) of iAspire fellowship in Data Science. The names of team members are Oluwatosin Oderinde, Pascal Okechukwu, and Olayinka Arimoro.
+This assignment tests our understanding of the fourth chapter of the book while making reference to some other parts of the text.
+This week's assignment centered on over fitting and model tuning such as considerations for choosing a data splitting method, determining tuning parameters, comparison between models  etc.
+
+## Exercise 4.1(a)
+```{r}
+# Data  splitting methods for these data?
+```
+The frequency distribution of the different genres in the musical dataset is:
+Samples <- 12495
+Predictors <- 191
+
+Using the above information, we can see that the number of samples (12495) is way bigger than the number of predictors (195). Therefore, it is very possible to split the dataset into training(samples used to craete the model) and test(sample used to qualify performance) data, this will help to effectively evaluate tuning parameter selection and model performance.
+
+In view of the lack of proportion, between the distribution of classes of the response variable, with classical having the highest percentage (over 3000) and metal with the lowest percentage (less than 1000), we might be inclined to use Stratified Random Sampling to split the dataset(Because the outcome is a number, the numeric values are broken into smaller groups and the randomization is executed within this groups). In doing this, there is higher likelihood that the outcome distributions will match.
+
+
+In addition, because the sample size is quite large, other resampling or cross-validation techniques like K-fold cross validation (it provides acceptable varaiance, low bias and its easy to compute) or Boostrap (its error rate tend to have less uncertainty than K-fold cross validation) might be used to evaluate model performance. However, it is worthy to note that for large sample sizes like we have, differences between resampling methods becomes less pronunced and computational efficiency begins to take precedence.  
+
+
+# Ecercise 4.3(a)
+```{r}
+# Calculate the PLS components that provides  the most parsimonious model
+library(AppliedPredictiveModeling)
+data("ChemicalManufacturingProcess")
+ResampledR = data.frame(
+  Components = c(1:10),
+  Mean = c(0.444, 0.500, 0.533, 0.545, 0.542, 0.537, 0.534, 0.534, 0.520, 0.507),
+  StdError = c(0.02722, 0.02958, 0.0302, 0.0308, 0.0322, 0.0327, 0.0333, 0.0330, 0.00326, 0.00326),
+  stringsAsFactors = FALSE
+)
+ResampledR
+```
+From the table above, at one standard error, the best setting is at 4 PLS and it has the following boundaries:
+lower boundary = 0.545 - 0.0308 = 0.5142
+upper boundary = 0.545 + 0.0308 = 0.5758
+
+This procedure would find the simplest tuning parameter settings associated with accuracy not less than (0.5142) from the table. Therefore, a model with 3 PLS(0.533) components is the simplest (parsimonious) model.
+
+
+## 4.3(b)
+```{r}
+# Compute tolerance values and optimal PLS components at 10% Loss of R^2
+data("ChemicalManufacturingProcess")
+
+error = c(0.02722, 0.02958, 0.0302, 0.0308, 0.0322, 0.0327, 0.0333, 0.0330, 0.00326, 0.00326)
+mean = c(0.444, 0.500, 0.533, 0.545, 0.542, 0.537, 0.534, 0.534, 0.520, 0.507)
+tolerance = round((mean - 0.545) / 0.545, 4)
+tol_table = data.frame(ResampledR, tolerance)
+tol_table
+```
+Numerical optimal value = 0.545
+10% loss accepted = 0.545 - 0.10 = 0.445
+
+Given that a 10% loss is accepted, then the best optimal number of PLS components (accuracy not less than 0.445) is at 2 PLS(0.500) components.
+
+
+# 4.3 (c)
+```{r}
+# Selecting mode(s) that optimizes R^2
+```
+
+From the Figure 4.13, we can see that the random forest has the highest value of R^2 (about 0.75) but the R^2 value of the SVM model is also close (about 0.72), where we can see some overlap. Therefore, we can conclude that the best models in terms of optimal R^2 values are random forest and Support Vector Machine.
+
+
+# 4.3 (d)
+```{r}
+# Selecting model(s) based on prediction time, model complexity and R^2 estimates
+```
+
+Given each models prediction time, the model complexity and R^2 estimates, the SVM should be choosen because it is faster than other models and its R^2 estimates is close to the best R^2. However if we were to need only the predictive function recorded, then we would need to consider the PLS and regression tree models although they give low R^2 estimates. Hence, choosing an ideal model is subjective to the modeler's needs.
+
+
+## Exercise 4.4
+
+The structure and table of the oilType is shown below 
+```{r} 
+library(caret)
+library(reshape2)
+data(oil)
+str(oilType)
+
+table(oilType)
+``` 
+
+To simply look at the percentage distribution of the oil types in the original samples, we plot a simple bar graph of the seven types qplot: 
+
+```{r} 
+qplot(oilType, horizontal = F, main = 'Percentage Distribution of Oil Types in Original Sample')
+``` 
+
+
+And to show the frequency distribution
+```{r} 
+data(oil)
+tb = round(table(oilType) / 96, 2)
+barchart(tb, horizontal = F, main = 'Percentage Distribution of Oil Types in original samples')
+dist = as.data.frame(round(table(oilType) / 96, 2))
+``` 
+
+
+# 4.4 (a)
+```{r}
+#*Using the sample() function to create a completely random sample of 60 oils.* 
+
+```
+
+We use the set.seed() to allow these results to be replcated in other observations.
+Taking 20 random samplings per 60 of the samples
+
+```{r} 
+SampleNumber = 60
+set.seed(4629)
+list_table = vector(mode = "list", length = 20)
+
+for(i in 1:length(list_table))
+  list_table[[i]] = round(table(sample(oilType, size = SampleNumber)) / 60, 2)
+
+barchart(list_table[[1]], horizontal = F, main = 'Percentage Distribution of Oil Types in Random Samples - 1')
+``` 
+
+```{r} 
+barchart(list_table[[2]], horizontal = F, main = 'Percentage Distribution of Oil Types in Random Samples - 2')
+``` 
+
+```{r} 
+barchart(list_table[[3]], horizontal = F, main = 'Percentage Distribution of Oil Types in Random Samples - 3')
+``` 
+
+20 different random samplings of the 60 samples were independently observed, and their frequency distribution differs from that of the original sample above. In some instance, the frequency of ‘D’ is zero. This shows that the training set could possibly not capture all the classes, and this might be ineffective for modeling.
+
+
+# 4.4 (b)
+```{r}
+#*Sampling using the caret package function createDataPartition to create stratified random samples* 
+
+set.seed(6108)
+list_caret = createDataPartition(oilType, p = 0.6, times = 20)
+perc_caret = lapply(list_caret, function(x, y) round(table(y[x])/60, 2), y = oilType)
+
+barchart(perc_caret[[1]], horizontal = F, main = 'Distribution using createDataPartition - 1')
+``` 
+
+```{r} 
+barchart(perc_caret[[2]], horizontal = F, main = 'Distribution using createDataPartition - 2')
+``` 
+
+We find that, unlike the completely random samples above, the createDataPartition function generates random samples that are significantly alike to the original sample in terms of the frequency distribution, relatively maintaining the frequencies distribution in the original dataset. 
+Comparing with the use of random sampling, this method produces a better result due to its keeping the frequencies distribution of the original dataset, preserving the class dirstribution in the sample.The createDataPartition virtually creates balanced splits of the data.
+
+
+# 4.4 (c)
+```{r}
+#*Determining the performance of a model with small sample size:* 
+``` 
+
+Dividing the dataset into training and test sets for a small sample size as this would be inefficient for a model. This is because every sample may be needed for the model building, even as the training set might not be sufficient to capture all aspects of the predictors. 
+Hence, resampling methods such as Leave Out One Cross-Validation would be a reasonable option to determine the performance of the model, as it evaluates many alternate versions of the data.
+
+
+# 4.4 (d)
+```{r}
+#*Understanding the uncertainty of a test set using binomial test:*  
+
+sample_size = c(10, 15, 20, 25, 30, 20, 20, 20, 20, 20)
+accuracy = c(0.9, 0.9, 0.9, 0.9, 0.9, 0.75, 0.80, 0.85, 0.9, 0.95)
+bin1 = binom.test(round(accuracy[1]*sample_size[1]), sample_size[1])
+dt = t(as.data.frame(round(bin1$conf.int, 3)))
+
+for(i in 2:10)
+{
+  bin = binom.test(round(accuracy[i]*sample_size[i]), sample_size[i])
+  new_tb = t(as.data.frame(round(bin$conf.int, 3)))
+  dt = rbind(dt, new_tb)
+}
+
+rownames(dt) = NULL
+colnames(dt) = c('lower_bound', 'upper_bound')
+
+dt1 = data.frame(sample_size, accuracy)
+dt2 = cbind(dt1, dt)
+dt2$width = dt2$upper_bound - dt2$lower_bound
+cat("Table of width using diffrent sample size and accuracy") 
+
+Sample_Size <- sample_size 
+Accuracy <- accuracy
+Lower_Bound <- dt2$lower_bound
+Upper_Bound <- dt2$upper_bound
+Width <- dt2$width
+
+table <- data.frame(Sample_Size, Accuracy, Lower_Bound, Upper_Bound, Width)
+
+# Table of width using diffrent sample size and accuracy
+table
+``` 
+
+From this table, we observe that the width of the confidence interval reduces as the sample size increases. This makes sense because larger sample sizes would aid better models. The accuracy (or otherwise power) is also noted to increase as the CI width decreases. Therefore, if sample size cannot be increased, then an increase in accuracy would result in a better model, and if the accuracy cannot be increased, and increase in sample size would suffice for a better model. 
+
+From the table above, the width of the confidence interval for reduces as the sample size increases. Likewise, the width reduces as the accuracy increases. Hence, if accuracy cannot be increased, then increased sample size can aid a better model. Also, if sample size cannot be increased, then increased accuracy would result in a better model.
+

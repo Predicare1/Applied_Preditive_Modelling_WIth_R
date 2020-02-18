@@ -1,0 +1,131 @@
+---
+title: "Assignment_Two_APMR_Group_8"
+author: "Oluwatosin_Oderinde, Pascal_Okechukwu, Olayinka_Arimoro"
+date: "January 30, 2020"
+output: html_document
+---
+About Assignment Two
+This assignment was completed on `r date()`. This is the assignment two of the Applied Predictive Modelling in R by Max Kuhn and Kjell Johnson. This assignment was submitted by team 8 members (module 2) of iAspire fellowship in Data Science. The names of team members are Oluwatosin Oderinde, Pascal Okechukwu, and Olayinka Arimoro.
+This assignment tests our understanding of the fourth chapter of the book while making reference to some other parts of the text.
+This week's assignment centered on over fitting and model tuning such as considerations for choosing a data splitting method, determining tuning parameters, comparison between models  etc.
+
+## Exercise 4.1(a)
+Using the information above, the number of samples (12495) is largely greater than the number of predictors (195). Hence, it is visible to split the dataset into training and test set, this will enable the evaluation of model performance and tuning parameter selection.
+
+Given the imbalance in the distribution of classes in the response variable, classical has the highest percentage and metal with the lowest, it might be suggested to use stratified random sampling method to split the dataset.
+
+Also, because of the large sample size, resampling or cross-validation techniques might be used to estimate model performance. K-fold cross-validation with k as 5 or 10 would be less computationally expensive.
+
+## Exercise 4.3(a)
+```{r}
+library(AppliedPredictiveModeling)
+data("ChemicalManufacturingProcess")
+ResampledR = data.frame(
+  Components = c(1:10),
+  Mean = c(0.444, 0.500, 0.533, 0.545, 0.542, 0.537, 0.534, 0.534, 0.520, 0.507),
+  StdError = c(0.02722, 0.02958, 0.0302, 0.0308, 0.0322, 0.0327, 0.0333, 0.0330, 0.00326, 0.00326),
+  stringsAsFactors = FALSE
+)
+ResampledR
+```
+From the table above, at one standard error, the best setting is at 4 PLS and it has the following boundaries:
+lower boundary = 0.545 - 0.0308 = 0.5142
+upper boundary = 0.545 + 0.0308 = 0.5758
+
+This procedure would find the simplest tuning parameter settings associated with accuracy not less than (0.5142) from the table. Therefore, a model with 3 PLS(0.533) components is the simplest (parsimonious) model.
+
+## Exercise 4.3(b)
+```{r}
+data("ChemicalManufacturingProcess")
+error = c(0.02722, 0.02958, 0.0302, 0.0308, 0.0322, 0.0327, 0.0333, 0.0330, 0.00326, 0.00326)
+mean = c(0.444, 0.500, 0.533, 0.545, 0.542, 0.537, 0.534, 0.534, 0.520, 0.507)
+tolerance = round((mean - 0.545) / 0.545, 4)
+tol_table = data.frame(ResampledR, tolerance)
+tol_table
+```
+Numerical optimal value = 0.545
+10% loss accepted = 0.545 - 0.10 = 0.445
+
+Given that a 10% loss is accepted, then the best optimal number of PLS components (accuracy not less than 0.445) is at 2 PLS(0.500) components.
+
+```{r}
+# 4.3 (c)
+```
+From the Figure 4.13, we can see that the random forest has the highest value of R^2 (about 0.75) but the R^2 value of the SVM model is also close (about 0.72), where we can see some overlap. Therefore, we can conclude that the best models in terms of optimal R^2 values are random forest and Support Vector Machine.
+```{r}
+# 4.3 (d)
+```
+Given each models prediction time, the model complexity and R^2 estimates, the SVM should be choosen because it is faster than other models and its R^2 estimates is close to the best R^2. However if we were to need only the predictive function recorded, then we would need to consider the PLS and regression tree models although they give low R^2 estimates. Hence, choosing an ideal model is subjective to the modeler's needs.
+
+## Exercise 4.4 (a)
+```{r}
+library(caret)  # Loading the package
+data(oil)       # Load the "oil" data
+# Checking the structure of oilType (OilType is a categorical variable 7 level)
+str(oilType)
+table(oilType)   # Checking the original frequency of oilType
+
+tb = round(table(oilType) / 96, 2)
+barchart(tb, horizontal = F, main = 'Percentage Distribution of in original samples')
+
+# Taking random sample of 60 oils
+sampNum = 60
+set.seed(42)     # This is so that the result is reproducable
+
+# Creating a list that generates the random samples 20 times
+list_table = vector(mode = "list", length = 20)
+
+# Function that repeats the procedure and produces the a frequency on a bar chart
+for(i in 1:length(list_table)){
+  list_table[[i]] = round(table(sample(oilType, size = sampNum)) / 60, 2)
+}
+  
+barchart(list_table[[1]], horizontal = F, main = 'Percentage distribution in random samples - 1')
+
+barchart(list_table[[7]], horizontal = F, main = 'Percentage distribution in random samples - 7')
+# Observation
+# Frequencies in the random sample differ from that of the original samples. 20 different random samplings of 60 samples each were further looked, yet there frequencies distribution differ from the original sample. In some instance, the frequency of 'G' is zero, hence, the training set will not capture all the classes. This might be ineffective for modeling.
+```
+## Exercise 4(b)
+
+```{r}
+set.seed(109432)
+listStratified = createDataPartition(oilType, p = 0.60, times = 20)
+stratifiedPerc = lapply(listStratified, function(x, y) round(table(y[x])/60, 2), y = oilType)
+
+barchart(stratifiedPerc[[1]], horizontal = F, main = 'Distribution using createDataPartition - 1')
+barchart(stratifiedPerc[[2]], horizontal = F, main = 'Distribution using createDataPartition - 2')
+
+# Observation
+# The createDataPartition function generates random samples that are significantly closer to the original sample in terms of the frequency distribution. It tends to relatively maintain the frequencies distribution in the original dataset. When compared with the use of random sampling, it produces a better result in terms of keeping the frequencies distribution of the original dataset. Also, this tends to include all the classes in the random sample selection.
+```
+## Exercise 4.4(c)
+In any case, where there is small sample size, it might be inefficient to partition the dataset into train and test datasets. This is because the train set might not be sufficient to capture all aspects of the predictors.
+
+Hence, LOOCV would be a reasonable option to determine the performance of the model.
+
+## Exercise 4.4(d)
+```{r}
+sample_size = c(10, 15, 20, 25, 30, 20, 20, 20, 20, 20)
+accuracy = c(0.9, 0.9, 0.9, 0.9, 0.9, 0.75, 0.80, 0.85, 0.9, 0.95)
+bin1 = binom.test(round(accuracy[1]*sample_size[1]), sample_size[1])
+dt = t(as.data.frame(round(bin1$conf.int, 3)))
+
+for(i in 2:10)
+{
+  bin = binom.test(round(accuracy[i]*sample_size[i]), sample_size[i])
+  new_tb = t(as.data.frame(round(bin$conf.int, 3)))
+  dt = rbind(dt, new_tb)
+}
+
+rownames(dt) = NULL
+colnames(dt) = c('lower_bound', 'upper_bound')
+
+dt1 = data.frame(sample_size, accuracy)
+dt2 = cbind(dt1, dt)
+dt2$width = dt2$upper_bound - dt2$lower_bound
+cat("Table of width using diffrent sample size and accuracy")
+data.frame(dt2)
+```
+From the table above, the width of the confidence interval for reduces as the sample size increases. Likewise, the width reduces as the accuracy increases. Hence, if accuracy cannot be increased, then increased sample size can aid a better model. Also, if sample size cannot be increased, then increased accuracy would result in a better model.
+

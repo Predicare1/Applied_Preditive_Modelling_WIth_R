@@ -1,0 +1,490 @@
+---
+title: "Assignment_Three_APMR_Group_8"
+author: "Olayinka_Arimoro, Oluwatosin_Oderinde, Pascal_Okechukwu"
+date: "February 7, 2020"
+output: html_document
+---
+
+About Assignment Three
+This assignment was completed on `r date()`. This is the assignment three (Exercise 6.3 and 7.5) of the Applied Predictive Modelling in R by Max Kuhn and Kjell Johnson. This assignment was submitted by team 8 members of iAspire fellowship in Data Science. The names of team members are Olayinka Arimoro, Oluwatosin Oderinde, and Pascal Okechukwu.
+This assignment tests our understanding of chapter 6 and 7 of the book that centered on building linear regression models and non-linear models.
+
+## Exercise 6.3
+```{r}
+# Loading the dataset
+library(AppliedPredictiveModeling)
+data("ChemicalManufacturingProcess")
+str(ChemicalManufacturingProcess)
+
+# Subsetting the data into the predictors (X) and the outcome (Y)
+X <- subset(ChemicalManufacturingProcess,select= -Yield)
+Y <- subset(ChemicalManufacturingProcess,select="Yield")
+```
+```{r}
+# Splitting the dataset
+library(caret)
+set.seed(517)
+trainingRows <- createDataPartition(Y$Yield,
+                                    p = 0.7, # Splitting on a 70% - 30% basis
+                                    list = FALSE)
+
+# Subset the data into objects for training using integer sub-setting
+trainX <- X[trainingRows,]
+trainY <- Y[trainingRows,]
+
+# For test dataset
+testX <- X[-trainingRows,]
+testY <- Y[-trainingRows,]
+
+# Checking the structure and dimension of the training dataset
+str(trainX)
+dim(trainX)
+
+# Checking the structure and dimension of the training dataset
+str(testX)
+dim(testX)
+
+# This shows that training set has 124 observations out of 176 observations and 57 predictors. The test set has 52 observations out of 176 observations.
+```
+## Exercise 6.3(b)
+```{r}
+
+# Checking for missing data
+sum(is.na(trainX))
+sum(is.na(testX))
+
+# This means there are 106 missing values in the dataset.
+
+# Checking how many percentage of the data are missing.
+library(VIM)
+library(mice)
+aggr(ChemicalManufacturingProcess, 
+     prop = c(T, T), 
+     col = c('navyblue','yellow'),
+     bars = T,
+     gap = 3, 
+     labels = names(ChemicalManufacturingProcess),
+     cex.axis = 0.7,
+     numbers = T, 
+     sortVars=T)
+
+# It was noticed from the data that about 14% were missing. We can impute the missing values using the predictive mean modeling froom the mice package as we have done in previous assignments. We decided to use the K-nearest neighbours impute method.
+
+# Pre-process trainX and apply to trainX and testX using `predict` and imputting missing values using knn
+
+trans <- preProcess(trainX,
+                 method=c("BoxCox","center","scale","knnImpute"))
+trans1 <- preProcess(testX,
+                 method=c("BoxCox","center","scale","knnImpute"))
+
+# Applying on the training and test predictors
+trainXTrans <- predict(trans, trainX)
+testXTrans <- predict(trans1, testX)
+
+# As learnt in earlier chapter, it is important to check for near zero variables and highly correlated variables in the predictors as seen in section 3.8 (page 55 and 56)
+
+# (I) Identify and remove NZV
+transNZV = nearZeroVar(
+  trainXTrans,
+  saveMetrics = TRUE) # We save metrics so as to retain information about each predictor
+
+# Checking through the list of predictor variables that are degenerate (near zero variance predictors)
+rownames(transNZV)[transNZV$nzv]
+
+#This shows that there only one predictor variable is degenerate. We need to remove this variable.
+
+trainXTrans <- trainXTrans[-transNZV$nzv]
+testXTrans <- testXTrans[-transNZV$nzv]
+
+ncol(trainXTrans) 
+ncol(testXTrans)
+# There are now 56 predictors in both the training and test set
+
+# Additionally, there are no missing values in the training and testing dataset
+sum(is.null(trainXTrans))
+sum(is.null(testXTrans))
+
+# (II) Identify and remove highly correlated predictors
+Xcorr = cor(trainXTrans)
+
+highCorr <- findCorrelation(Xcorr)
+
+# Removing predictors with hig correlation in the training and testing dataset
+trainXTrans <- trainXTrans[, -highCorr]
+testXTrans <- testXTrans[, -highCorr]
+
+dim(trainXTrans) # We now have 47 predictors in the training set
+dim(testXTrans) # We now have 47 predictors in the testing set
+```
+## Exercise 6.3(c)
+```{r}
+
+# Due to the amount predictors and moderate pairwise correlation in the 48 predictors left. A dimension reduction or shrinkage technique would be an appropriate model for this data.  Here we will tune a PLS model on the training data using 25 iterations of bootstrap cross-validation (of course 10 fold CV could be used too).
+
+# Tuninng the PLS model
+set.seed(100)
+ctrl = trainControl(method = "boot", number = 25)
+
+plsTune <- train(trainXTrans, y = trainY,
+                 method = "pls",
+                 tuneGrid = expand.grid(ncomp = 1:20),
+                 trControl = ctrl)
+plsTune
+plot(plsTune, metric = "RMSE")
+
+# RMSE was used to select the optimal model using the smallest value.The final value used for the model was ncomp = 3. This was clearly seen from the plot.
+
+# Showing the optimal number of latent variables that maximizes R^2
+best(plsTune$results, "Rsquared", maximize = TRUE)
+
+# This also shows that the maximum R^2 was at when number of components is equal to 3 
+
+# Showing this in a plot
+plotTheme <- bookTheme()
+trellis.par.set(plotTheme)
+plot(plsTune,
+     metric="Rsquared",
+     main = "Plot of Number of Components Versus R^2")
+
+# The plot shows that when the number of components is 3, then the R^2 is maximized.
+```
+## Exercise 6.3 (d)
+```{r}
+# Predicting the response for the test set
+
+Predicted <- predict(plsTune, testXTrans)
+Observed <- testY
+
+# PLS predictions for the test set for the data
+plsTest <- data.frame(Observed,Predicted)
+plsTest
+
+# Plotting the observed versus the predicted
+# Defining plot parameters
+scatterTheme <- caretTheme()
+scatterTheme$plot.line$col <- c("blue")   # defines the color
+scatterTheme$plot.line$lwd <- 2           # defines the line width
+scatterTheme$plot.symbol$col <- rgb(0, 0, 0, .3)
+scatterTheme$plot.symbol$cex <- 0.8
+scatterTheme$plot.symbol$pch <- 16   # Plots the points as filled circle
+scatterTheme$add.text <- list(cex = 0.6)
+trellis.par.set(scatterTheme)
+
+# Rendering the plot
+xyplot(Predicted ~ Observed,
+       plsTest,
+       panel = function(...) {
+         theDots <- list(...)
+         panel.xyplot(..., type = c("p", "g","r","smooth"))
+         corr <- round(cor(theDots$x, theDots$y), 2)
+         panel.text(44,
+                    min(theDots$y),
+                    paste("corr:", corr))
+       },
+       ylab = "Predicted",
+       xlab = "Observed",
+       main = "Scatter Plot of Observed Versus Predicted")
+
+# Next we will predict the response for the test set and compare the R^2 value with the one obtained through bootstrap cross-validation.  
+
+# The relationship is displayed in where the R^2 value
+
+round(cor(plsTest$Observed,plsTest$Predicted)^2, 3)
+
+# Bootstrap cross-validation estimated that a three-component PLS model would have an R^2 value of 
+round(plsTune$results[best(plsTune$results, 
+                           "Rsquared", 
+                           maximize = TRUE), "Rsquared"],3)
+```
+
+The cross validation result and the test performance had about the same performance from the results of the R^2 computed.
+
+## Exercise 6.3 (e)
+```{r}
+# Next, let's examine the variable importance values for the top 15 predictors for this data and model.
+plsImp <- varImp(plsTune, scale = FALSE)
+bookTheme()
+plot(plsImp, 
+     top=15,
+     main = "Variable Importance Plot for Optimal PLS",
+     scales = list(y = list(cex = 0.9)))
+
+# For this data, the manufacturing process predictors dominated the top part of the list.  This may be helpful for improving yield, since many of the manufacturing predictors can be controlled.
+```
+## Exercise 6.3(f)
+Explore the relationships between each of the top predictors and the response
+```{r}
+# Scatter plots of the top 3 correlated predictors in the data set after pre-processing.
+
+ImpVar <- order(abs(plsImp$importance),decreasing=TRUE)
+
+# Defining plot parameters
+scatterTheme <- caretTheme()
+scatterTheme$plot.line$col <- "red"
+scatterTheme$plot.line$lwd <- 2
+scatterTheme$plot.symbol$col <- "black"
+scatterTheme$plot.symbol$cex <- .6  # cex indicates the amount by which plotting                          text and symbols should be scaled relative to the default
+scatterTheme$add.text <- list(cex = .6)
+trellis.par.set(scatterTheme)
+
+# Selecting the top 3 important predictors to plot against the response
+top3Var = rownames(plsImp$importance)[ImpVar[c(1:3)]]
+
+# Rendering the plot
+par(mfrow = c(1,3)) 
+featurePlot(trainXTrans[, top3Var],
+            trainY,
+            plot = "scatter",
+            between = list(x = 1, y = 1),
+            type = c("g", "p", "smooth"),
+            layout = c(3,1),
+            labels = rep("", 2),
+  main = "Top Three Important Predictor Variable against the Response Variable")
+```
+Observation:
+Finally, we explored the relationships between the three top important predictors and the response.  The plot provides the univariate relationships with each of these predictors (after transformation) and the response.  Clearly, from the plot Process 9 and Process 32 have a positive relationship with Yield, while Process 13 has a negative relationship.  
+If these manufacturing processes can be controlled, then altering these steps in the process to have higher (or lower) values could improve the overall Yield of the process. 
+A statistically designed experiment could be used to investigate a causal relationship between the settings of these processes and the overall yield as leanrt from Data Science Research Methods.
+
+## Exercise 7.5 (a)
+```{r}
+# We still use variables from exercise 6.3
+# Building the SVM and KNN models
+
+# SVM Linear
+LSVMTune <- train(x = trainXTrans, y = trainY,
+                      method = "svmLinear",
+                      trControl = ctrl, 
+                      kpar = "automatic")
+LSVMTune
+LSVMTune$finalModel
+
+# SVM Radial
+RSVMTune <- train(x = trainXTrans, y = trainY,
+                      method = "svmRadial",
+                      trControl = ctrl, 
+                      tuneLength = 14)
+
+RSVMTune
+RSVMTune$finalModel
+
+# Polynomial SVM
+psvmTuneGrid <- expand.grid(C=c(0.01,0.05,0.1),
+                            degree=c(1,2), 
+                            scale=c(0.25,0.5,1))
+
+PSVMTune <- train(x = trainXTrans, y = trainY,
+                      method = "svmPoly",
+                      trControl = ctrl, 
+                      tuneGrid = psvmTuneGrid)
+
+PSVMTune
+PSVMTune$finalModel
+
+# KNN
+KNNTune <- train(x = trainXTrans, y = trainY,
+                      method = "knn",
+                      trControl = ctrl, 
+                      tuneGrid = data.frame(k = 1:20))
+
+KNNTune
+KNNTune$finalModel
+
+# Choosing which model gives optimal resampling and test set performance
+
+# We checked the different models based on their performance
+
+# (I) Linear SVM
+
+# Checking the optimal R^2
+round(LSVMTune$results$Rsquared[best(LSVMTune$results, "Rsquared", maximize = TRUE)],2)
+# Checking the optimal cost that maximize R^2
+LSVMTune$results$C[best(LSVMTune$results, "Rsquared", maximize = TRUE)]
+# Checking the optimal RMSE that maximize R^2
+LSVMTune$results$RMSE[best(LSVMTune$results, "Rsquared", maximize = TRUE)]
+
+# This indicates that the optimal cost and RMSE that maximize R^2 are cost = 1 and RMSE = 4.68 corresponding to R^2 of 0.26
+
+# (II) Radial SVM
+
+# Checking the optimal R^2
+round(RSVMTune$results$Rsquared[best(RSVMTune$results, "Rsquared", maximize = TRUE)],2)
+# Checking the optimal cost that maximize R^2
+RSVMTune$results$C[best(RSVMTune$results, "Rsquared", maximize = TRUE)]
+# Checking the optimal RMSE that maximize R^2
+RSVMTune$results$RMSE[best(RSVMTune$results, "Rsquared", maximize = TRUE)]
+# Checking the optimal parameter sigma that maximize R^2
+RSVMTune$results$sigma[best(RSVMTune$results, "Rsquared", maximize = TRUE)]
+
+# This indicates that the optimal cost, RMSE and sigma that maximize R^2 are cost = 8, RMSE = 1.21, and sigma = 0.017 corresponding to R^2 of 0.57
+
+# (III) Polynomial SVM
+
+# Checking the R^2
+round(PSVMTune$results$Rsquared[best(PSVMTune$results, "Rsquared", maximize = TRUE)],2)
+# Checking the optimal degree that maximize R^2
+PSVMTune$results$degree[best(PSVMTune$results, "Rsquared", maximize = TRUE)]
+# Checking the optimal cost that maximize R^2
+PSVMTune$results$C[best(PSVMTune$results, "Rsquared", maximize = TRUE)]
+# Checking the optimal scale that maximize R^2
+PSVMTune$results$scale[best(PSVMTune$results, "Rsquared", maximize = TRUE)]
+# Checking the optimal RMSE that maximize R^2
+PSVMTune$results$RMSE[best(PSVMTune$results, "Rsquared", maximize = TRUE)]
+
+# This indicates that the optimal degree, cost, scale and RMSE that maximize R^2 are degree = 1, cost = 0.01, scale = 0.25 and RMSE = 1.73 corresponding to R^2 of 0.3
+
+# (IV) KNN
+
+# Checking the optimal R^2
+round(KNNTune$results$Rsquared[best(KNNTune$results, "Rsquared", maximize = TRUE)],2)
+# Checking optimal number of k (neighbours) that maximize R^2
+KNNTune$results$k[best(KNNTune$results, "Rsquared", maximize = TRUE)]
+# Checking optimal RMSE that maximize R^2
+KNNTune$results$RMSE[best(KNNTune$results, "Rsquared", maximize = TRUE)]
+
+# This indicates that the optimal number of neighbours and RMSE that maximize R^2 are k = 4, and RMSE = 1.43 corresponding to R^2 of 0.43
+
+# Looking at the above values, the Radial SVM looks to fit the data the most. One way to look at it using the individual R^2. The Radial SVM has a R^2 value of 0.57 which outweighs others. Using the the RMSE, the Radial SVM gives the lowest value of 1.21
+
+# Plotting the models to view the optimal performances as stated above
+
+# Defining plot parameters
+plotTheme <- bookTheme()
+trellis.par.set(plotTheme)
+
+# We could not plot the Linear SVM because it does not have tuning parameters.
+
+# Plotting the Radial SVM based on the R^2
+plot(RSVMTune,
+     metric="Rsquared",
+     main = "Optimal Radial SVM Model Plot")
+
+# Plotting the Polynomial SVM based on the R^2
+plot(PSVMTune,
+     metric="Rsquared",
+     main = "Optimal Polynomial SVM Model Plot")
+
+# Plotting the KNN model based on the R^2
+plot(KNNTune,
+     metric="Rsquared",
+     main = "Optimal KNN Model Plot")
+
+# The plot we made above agrees with the values we got from the performance metrics.
+```
+Choosing the best model as Radail SVM Model. We proceed to make predictions with it.
+```{r}
+# On many grounds the Radial SVM was a better model
+# Predicting with the Radial SVM model
+
+Predicted <- predict(RSVMTune,testXTrans)
+Observed <- testY
+
+# Radial SVM predictions for the test set for the data
+RSVMTest <- data.frame(Observed,Predicted)
+RSVMTest
+
+# Plotting the Predicted versus the Observed
+
+# Defining plot parameters
+scatterTheme <- caretTheme()
+scatterTheme$plot.line$col <- c("blue")
+scatterTheme$plot.line$lwd <- 2
+scatterTheme$plot.symbol$col <- rgb(0, 0, 0, .3)
+scatterTheme$plot.symbol$cex <- 0.8
+scatterTheme$plot.symbol$pch <- 16
+scatterTheme$add.text <- list(cex = 0.6)
+trellis.par.set(scatterTheme)
+
+# Rendering the plot
+xyplot(Predicted ~ Observed,
+       RSVMTest,
+       panel = function(...) {
+         theDots <- list(...)
+         panel.xyplot(..., type = c("p", "g","r","smooth"))
+         corr <- round(cor(theDots$x, theDots$y), 2)
+         panel.text(44,
+                    min(theDots$y),
+                    paste("corr:", corr))
+       },
+       ylab = "Predicted",
+       xlab = "Observed",
+       main = "Optimal Radial SVM Model Plot of Observed and Predicted")
+
+# The relationship is displayed in where the R^2 value
+round(cor(RSVMTest$Observed,RSVMTest$Predicted)^2, 3)
+
+# Bootstrap cross-validation estimated that the model would have an R^2 value of 
+round(RSVMTune$results[best(RSVMTune$results, 
+                           "Rsquared", 
+                           maximize = TRUE), "Rsquared"],3)
+
+# Here, the test set performance has a R^2 of 0.603 while the bootstrap cross validation has a R^2 value of 0.571. This means the test performance performs slightly better than the cross validation.
+```
+
+Observation:
+On camparing between the final PLS model from exercise 6.3 and the final Radial SVM model from exercise 7.5.
+The final Radial SVM model with R^2 of 0.603 has a better test set performance than the optimal PLS model with R^2 of 0.59 (see solutions from Exercise 6.3).
+However, the optimal PLS with R^2 of 0.581 has a better cross-validation performance than the optimal Radial SVM with R^2 of 0.571.
+This would indicate that the underlying structure between the predictors and the response is approximately linear.
+We can use marginal plots of each predictor in the model to better understand the relationship that the Radial SVM model has detected.
+
+Next, we proceed to identify the importance variables in order to view the relationship.
+
+## Exercise 7.5(b)
+```{r}
+
+# Defining the importance variables of the Radial SVM model
+VarsImp <- varImp(RSVMTune, scale = FALSE)
+
+# Plotting the important top 15 predictors
+plot(VarsImp, top=15, 
+     main = "Variable Importance Plot for Optimal Radial SVM",
+     scales = list(y = list(cex = 0.9)))
+
+# Referring back to plot of the solutions from exercise 6.3, the top two PLS predictors are ManufacturingProcess32 and ManufacturingProcess09. 
+# For the Radial SVM model, the top two PLS predictors are ManufacturingProcess32 and ManufacturingProcess06.
+
+# PLS, however, identifies additional predictive information from the other predictors that improve the predictive ability of the models.  Overall, many of the manufacturing process predictors are at the top of the importance list.
+
+# Sorting in order of importance
+impOrder <- order(VarsImp$importance$Overall, decreasing=TRUE)
+ImpVars <- rownames(VarsImp$importance)[impOrder]
+
+# Selecting the top 3 important predictors to plot against the response
+top3 <- ImpVars[1:3]
+
+# # Scatter plots of the top 3 correlated predictors in the data set with the response after pre-processing.
+
+# Defining plot parameters
+scatterTheme <- caretTheme()
+scatterTheme$plot.line$col <- "red"
+scatterTheme$plot.line$lwd <- 2
+scatterTheme$plot.symbol$col <- "black"
+scatterTheme$plot.symbol$cex <- .6
+scatterTheme$add.text <- list(cex = .6)
+trellis.par.set(scatterTheme)
+
+# Scatter plots of the top 3 correlated predictors in the data set after pre-processing.
+
+# Rendering the plot
+featurePlot(trainXTrans[, top3],
+            trainY,
+            plot = "scatter",
+            between = list(x = 1, y = 1),
+            type = c("g", "p", "smooth"),
+            layout = c(3,1),
+            labels = rep("", 2),
+      main = "Top 3 Important Predictor Variable Plot Versus the Response Varaible")
+
+# The plot displays the marginal relationships between the predictors identified by the model and the predicted response. Based on this figure, the underlying relationships are approximately linear in this model.
+```
+```{r}
+## Exercise 7.5 (c)
+```
+## Exercise 7.5 (c)
+Observation:
+Finally, we explored the relationships between the three top important predictors and the response.  The plot provides the univariate relationships with each of these predictors (after transformation) and the response.  Clearly Process 6 and Process 32 have a positive relationship with Yield, while Process 13 has a negative relationship.  
+If these manufacturing processes can be controlled, then altering these steps in the process to have higher (or lower) values could improve the overall Yield of the process.  
+As suggested earlier, a statistically designed experiment could be used to investigate a causal relationship between the settings of these processes and the overall yield.
+
+

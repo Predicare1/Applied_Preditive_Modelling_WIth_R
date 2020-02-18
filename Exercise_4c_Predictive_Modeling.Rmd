@@ -1,0 +1,51 @@
+---
+title: "Applied_Predictive_Modelling_Assignment"
+author: "Oluwabunmi Oderinde"
+date: "2/1/2020"
+output: html_document
+---
+
+```{r}
+#4a)
+
+library("AppliedPredictiveModeling")
+data("ChemicalManufacturingProcess")
+ResampledR = data.frame(
+  Components = c(1:10),
+  Mean = c(0.444, 0.500, 0.533, 0.545, 0.542, 0.537, 0.534, 0.534, 0.520, 0.507),
+  StdError = c(0.02722, 0.02958, 0.0302, 0.0308, 0.0322, 0.0327, 0.0333, 0.0330, 0.00326, 0.00326),
+  stringsAsFactors = FALSE
+)
+ResampledR
+```
+From the table above, at one standard error, the best setting is at 4 PLS and it has the ffg boundaries:
+lower boundary = 0.545 - 0.0308 = 0.5142
+upper boundary = 0.545 + 0.0308 = 0.5758
+
+This procedure would find the simplest tuning parameter settings associated with accuracy not less than (0.5142) from the table. Therefore, a model with 3 PLS(0.533) components is the most simpler model
+
+```{r}
+#4b)
+
+data("ChemicalManufacturingProcess")
+error = c(0.02722, 0.02958, 0.0302, 0.0308, 0.0322, 0.0327, 0.0333, 0.0330, 0.00326, 0.00326)
+mean = c(0.444, 0.500, 0.533, 0.545, 0.542, 0.537, 0.534, 0.534, 0.520, 0.507)
+tolerance = round((mean - 0.545) / 0.545, 4)
+tolerance
+```
+Numerical optical value = 0.545
+10% loss accepted = 0.545 - 0.10 = 0.445
+
+Given that a 10% loss is accepted, then the best optimal number of PLs components(accuracy not less than 0.445) is at 2 PLS(0.500) components.
+
+
+```{r}
+#4c)
+```
+From the Figure 4.13, we can see that the random forest has the highest value of R^2 but the R^2 value of the SVM model is also close, where we can see some overlap. Therefore, we can conclude that the best models in terms of optimal R^2 values are random forest and Support Vector Machine
+
+
+```{r}
+#4c)
+```
+Given each models prediction time, the model complexity and R^2 estimates, the SVM should be choosen because it is faster than other models and its R^2 estimates is close to the best R^2.However if we were to need only the predictive function recorded, then we would need to consider the PLS and regression tree models although they give low R^2 estimates. Hence, choosing an ideal model is subjective to the modeler's needs.
